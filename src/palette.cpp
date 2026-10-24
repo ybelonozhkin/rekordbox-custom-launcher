@@ -21,6 +21,12 @@ static bool enabled=true, mutedBlue=true;
 static int blueDimming=100, tintStrength=0;
 static uint32_t tintColor=0;
 static uint8_t tintTable[3][256]; // R, G, B; prepared once at startup.
+static bool highlightEnabled=false, customHighlightSource=false;
+static uint32_t highlightColor=0, highlightSourceColor=0x1473e6;
+static int highlightStrength=100;
+static int highlightSource[3]{20,115,230}, highlightTarget[3]{};
+static int highlightSourceMin=20, highlightSourceChroma=210;
+static unsigned highlightCoverage[256];
 static wchar_t paletteLog[MAX_PATH];
 static std::atomic<unsigned> frameCount{0};
 static uint32_t greyTable[256];
@@ -49,6 +55,38 @@ static uint32_t TintPixel(uint32_t p) {
     return (p&0xff000000)|(uint32_t(tintTable[0][(p>>16)&255])<<16)|
            (uint32_t(tintTable[1][(p>>8)&255])<<8)|tintTable[2][p&255];
 }
+static bool IsNativeBlue(int r,int g,int b) {
+    return b>g&&g>r&&(g-r)*4>(b-r)&&(g-r)*5<(b-r)*4;
+}
+static uint32_t HighlightPixel(uint32_t p,uint32_t base) {
+    if(!highlightEnabled||!highlightStrength)return base;
+    int rgb[]={int((p>>16)&255),int((p>>8)&255),int(p&255)};
+    int low=std::min({rgb[0],rgb[1],rgb[2]});
+    int chroma=std::max({rgb[0],rgb[1],rgb[2]})-low;
+    if(customHighlightSource) {
+        if(!highlightSourceChroma) {
+            // Neutral source colors have no hue; only match that exact shade.
+            if((p&0xffffff)!=highlightSourceColor)return base;
+        } else {
+            if(!chroma)return base;
+            int tolerance=chroma*highlightSourceChroma/5;
+            for(int i=0;i<3;i++)
+                if(std::abs((rgb[i]-low)*highlightSourceChroma-(highlightSource[i]-highlightSourceMin)*chroma)>tolerance)return base;
+        }
+    } else if(!IsNativeBlue(rgb[0],rgb[1],rgb[2]))return base;
+    unsigned coverage=highlightSourceChroma?highlightCoverage[chroma]:256;
+    int background=low*256-highlightSourceMin*int(coverage);
+    uint32_t result=p&0xff000000;
+    for(int i=0;i<3;i++) {
+        // Retain the neutral contribution at antialiased edges and dimmer shades.
+        int target=std::clamp((background+highlightTarget[i]*int(coverage)+128)/256,0,255);
+        int shift=16-i*8;
+        int previous=(base>>shift)&255;
+        unsigned value=unsigned((previous*(100-highlightStrength)+target*highlightStrength+50)/100);
+        result|=value<<shift;
+    }
+    return result;
+}
 
 static void WINAPI clearHook(float r,float g,float b,float a) {
     if(enabled && a>=0.999f && r==g && g==b && r>=0 && r<=1) {
@@ -71,7 +109,7 @@ static uint32_t BasePixel(uint32_t p) {
     }
     // Continuous colour transform also covers antialiased edges around text.
     // A flat-fill-only replacement would leave bright blue fringes.
-    if(mutedBlue && blueDimming && b>g && g>r && (g-r)*4>(b-r) && (g-r)*5<(b-r)*4) {
+    if(mutedBlue && blueDimming && IsNativeBlue(int(r),int(g),int(b))) {
         int strength=std::min(210,int(b-r));
         int nr=std::clamp(int(neutral[r])+12*strength/210,0,255);
         int ng=std::clamp(int(neutral[g])-47*strength/210,0,255);
@@ -83,13 +121,24 @@ static uint32_t BasePixel(uint32_t p) {
     }
     return p;
 }
-static uint32_t mapPixel(uint32_t p) {return TintPixel(BasePixel(p));}
+static uint32_t mapPixel(uint32_t p) {
+    uint32_t result=BasePixel(p);
+    if(highlightEnabled&&highlightStrength)result=HighlightPixel(p,result);
+    return TintPixel(result);
+}
 static void PreparePalette() {
+    for(int i=0;i<3;i++) {
+        highlightSource[i]=(highlightSourceColor>>(16-i*8))&255;
+        highlightTarget[i]=(highlightColor>>(16-i*8))&255;
+    }
+    highlightSourceMin=std::min({highlightSource[0],highlightSource[1],highlightSource[2]});
+    highlightSourceChroma=std::max({highlightSource[0],highlightSource[1],highlightSource[2]})-highlightSourceMin;
+    for(unsigned v=0;v<256;v++)highlightCoverage[v]=highlightSourceChroma?std::min(256u,(v*256+highlightSourceChroma/2)/highlightSourceChroma):256;
     for(int channel=0;channel<3;channel++) {
         int target=(tintColor>>(16-8*channel))&255;
         for(int v=0;v<256;v++)tintTable[channel][v]=uint8_t((v*(100-tintStrength)+target*tintStrength+50)/100);
     }
-    for(unsigned v=0;v<256;v++)greyTable[v]=TintPixel(unsigned(neutral[v])*0x010101);
+    for(unsigned v=0;v<256;v++)greyTable[v]=mapPixel(v*0x010101);
     int cpu[4];__cpuid(cpu,0);int maxLeaf=cpu[0];__cpuid(cpu,1);
     if(maxLeaf>=7&&(cpu[2]&(1<<27))&&(cpu[2]&(1<<28))&&(_xgetbv(0)&6)==6) {
         __cpuidex(cpu,7,0);haveAvx2=(cpu[1]&(1<<5))!=0;
@@ -169,6 +218,14 @@ static void ReadPaletteSettings(const wchar_t* path) {
     wchar_t tint[64]{};
     GetPrivateProfileStringW(L"Palette",L"TintColor",L"#000000",tint,64,path);
     if(!ParseRgb(tint,tintColor))tintStrength=0;
+    wchar_t target[64]{},source[64]{};
+    GetPrivateProfileStringW(L"Palette",L"HighlightColor",L"",target,64,path);
+    highlightEnabled=ParseRgb(target,highlightColor);
+    highlightStrength=std::clamp(int(GetPrivateProfileIntW(L"Palette",L"HighlightStrength",100,path)),0,100);
+    GetPrivateProfileStringW(L"Palette",L"HighlightSourceColor",L"",source,64,path);
+    customHighlightSource=source[0]!=0;
+    highlightSourceColor=0x1473e6;
+    if(customHighlightSource&&!ParseRgb(source,highlightSourceColor))highlightEnabled=false;
 }
 bool InstallPalette(const wchar_t* path) {
     ReadPaletteSettings(path);

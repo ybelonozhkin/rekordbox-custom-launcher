@@ -25,7 +25,9 @@ Font replacement affects the whole interface. Wider fonts can make BPM values or
 
 In `[Palette]`, set `TintColor` to any RGB hex color (`#RRGGBB`) and `TintStrength` to its strength from 0 to 100. This adds an overall tint to the processed interface image, including artwork; it isn't limited to blue highlights. For example, `TintColor=#C88B55` with `TintStrength=5` adds a subtle warm tint. Use 0 for no overlay; 100 fills the processed image with the chosen color. Separately rendered OpenGL content and native window elements are not covered by this image filter. Restart after changing settings.
 
-`BlueDimming` is a separate adjustment for blue highlights: 100 is the original muted preset, 50 is brighter, 0 keeps the original blue before tinting.
+To change the highlight color, set `HighlightColor` to any RGB hex color and `HighlightStrength` to 0–100. For example, `HighlightColor=#B06C42` and `HighlightStrength=100` replace the original blue with orange-brown. Leave `HighlightColor` empty to keep the current colors. This matches pixel colors rather than widget roles, so similar colors in images can change too.
+
+`HighlightSourceColor` optionally selects a different original color to replace; leave it empty to match rekordbox's native blue shades. `BlueDimming` remains available for the old blue-softening preset. The overall tint is applied after these adjustments. Restart to apply changes.
 
 Tested with rekordbox **7.2.18 and 7.2.19**, Windows x64. The newest installed version is selected automatically. Future versions may need changes to the hooks. The binaries are unsigned.
 

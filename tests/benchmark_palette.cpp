@@ -22,6 +22,26 @@ static bool CheckSettings() {
     ok=ok&&tintStrength==0;
     ok=ok&&set(L"TintColor",L"804020")&&set(L"TintStrength",L"999")&&set(L"BlueDimming",L"-1");
     ReadPaletteSettings(path);ok=ok&&tintStrength==100&&blueDimming==0;
+    ok=ok&&set(L"TintStrength",L"0")&&set(L"HighlightColor",L"#B06C42")&&set(L"HighlightStrength",L"100");
+    ReadPaletteSettings(path);PreparePalette();
+    ok=ok&&highlightEnabled&&mapPixel(0x7f1473e6)==0x7fb06c42;
+    // Half coverage over neutral RGB(32,32,32) retains the antialiasing background.
+    ok=ok&&mapPixel(0xff1a4a83)==0xff684631&&mapPixel(0xffd23c28)==0xffd23c28;
+    ok=ok&&set(L"HighlightStrength",L"50");ReadPaletteSettings(path);PreparePalette();
+    ok=ok&&mapPixel(0xff1473e6)==0xff627094;
+    ok=ok&&set(L"HighlightStrength",L"0");ReadPaletteSettings(path);PreparePalette();
+    ok=ok&&mapPixel(0xff1473e6)==0xff1473e6;
+    for(const wchar_t* target:{L"#000000",L"#FFFFFF",L"#808080",L"#20A060"}) {
+        uint32_t expected=0;ParseRgb(target,expected);
+        ok=ok&&set(L"HighlightColor",target)&&set(L"HighlightStrength",L"100");ReadPaletteSettings(path);PreparePalette();
+        ok=ok&&mapPixel(0x7f1473e6)==(0x7f000000|expected);
+    }
+    ok=ok&&set(L"HighlightSourceColor",L"#D23C28");ReadPaletteSettings(path);PreparePalette();
+    ok=ok&&mapPixel(0x7fd23c28)==0x7f20a060&&mapPixel(0xff1473e6)==0xff1473e6;
+    ok=ok&&set(L"HighlightSourceColor",L"#404040");ReadPaletteSettings(path);PreparePalette();
+    ok=ok&&mapPixel(0x7f404040)==0x7f20a060&&mapPixel(0xff414141)==BasePixel(0xff414141);
+    ok=ok&&set(L"HighlightSourceColor",L"bad");ReadPaletteSettings(path);ok=ok&&!highlightEnabled;
+    ok=ok&&set(L"HighlightColor",L"bad")&&set(L"HighlightSourceColor",L"");ReadPaletteSettings(path);ok=ok&&!highlightEnabled;
     DeleteFileW(path);
     tintStrength=0;blueDimming=0;PreparePalette();
     ok=ok&&mapPixel(0xff1473e6)==0xff1473e6;
@@ -36,7 +56,7 @@ int main(int argc, char** argv) {
     const int y[]={24,24,32,64,96,122,148,166,182,192};
     for(int v=0;v<256;v++){int k=0;while(k<8&&v>x[k+1])k++;neutral[v]=uint8_t(y[k]+(y[k+1]-y[k])*(v-x[k])/(x[k+1]-x[k]));}
     if(!CheckSettings()){fprintf(stderr,"Palette settings/known color test failed\n");return 3;}
-    printf("PASS: INI color parsing, tint endpoints, alpha, clamping and brighter blue highlights.\n");
+    printf("PASS: INI parsing, tint/highlight colors, arbitrary sources, endpoints, antialiasing, alpha and clamping.\n");
     auto start=Clock::now();PreparePalette();
     if(argc==2 && std::strcmp(argv[1],"--scalar")==0)haveAvx2=false;
     printf("SIMD available: %s; lookup table 1 KiB\n",haveAvx2?"AVX2":"scalar fallback");
@@ -69,8 +89,10 @@ int main(int argc, char** argv) {
         for(unsigned i=0;i<65536;i++)if(mapped[i]!=mapPixel(all[i]))return 2;
     }
     printf("PASS: all 16,777,216 RGB outputs match reference exactly.\n");
-    for(int variant=0;variant<2;variant++) {
-        tintColor=variant?0x204080:0xc88b55;tintStrength=variant?100:5;blueDimming=variant?0:50;
+    for(int variant=0;variant<5;variant++) {
+        tintColor=variant==1?0x204080:0xc88b55;tintStrength=variant==1?100:5;blueDimming=variant==1?0:50;
+        highlightEnabled=variant>=2;highlightColor=0xb06c42;highlightStrength=100;
+        customHighlightSource=variant>=3;highlightSourceColor=variant==4?0x404040:variant==3?0xd23c28:0x1473e6;
         PreparePalette();if(argc==2&&std::strcmp(argv[1],"--scalar")==0)haveAvx2=false;
         for(unsigned chunk=0;chunk<256;chunk++) {
             for(unsigned i=0;i<65536;i++)all[i]=0x7f000000|(chunk<<16)|i;
@@ -78,5 +100,5 @@ int main(int argc, char** argv) {
             for(unsigned i=0;i<65536;i++)if(mapped[i]!=mapPixel(all[i]))return 4;
         }
     }
-    printf("PASS: tinted palettes match scalar output for all RGB values; alpha preserved.\n");
+    printf("PASS: tint and arbitrary highlight colors/sources match scalar output for all RGB values; alpha preserved.\n");
 }
