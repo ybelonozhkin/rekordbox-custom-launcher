@@ -18,7 +18,7 @@
 | Window | DarkTitleBar | `1` requests a dark native title bar; default 1 |
 | Diagnostics | FontTrace | `1` logs font requests; default 0 |
 
-The local `Input` preset was downloaded through the font author's custom-family builder: Input Sans Compressed Light for Regular/Italic, and Input Sans Compressed Regular for Bold/Bold Italic. Its internal family name is `Input`. It isn't bundled. Release packages use Segoe UI instead, without changing the local config.
+Segoe UI is the default in both the repository and release packages. The optional Input setup is described in the [README](../README.md#optional-input-sans-compressed). It uses the author's existing Compressed designs, assembled through the official four-style family builder; the glyph outlines were not manually compressed. No font files are bundled.
 
 For a subtle warm tint, try `TintColor=#C88B55` and `TintStrength=5`. The RGB overlay is blended after the existing palette transform. A strength of 100 replaces the processed image with a flat color; use small values for a readable interface. An invalid color disables the overlay. The same tint is applied to adjusted dark OpenGL backgrounds. It can affect artwork and waveform images too.
 

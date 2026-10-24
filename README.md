@@ -12,14 +12,14 @@ The native window title bar also matches a dark Windows theme. This is enabled b
 2. Close rekordbox, then run `rekordbox-font.exe` from the extracted folder.
 3. To change the font, edit `font.ini` beside the EXE and restart through the launcher.
 
-Release ZIPs use Segoe UI by default. Choose the family name of any installed font:
+The default font is Segoe UI, included with Windows. You can choose the family name of any installed font:
 
 ```ini
 [Font]
 Family=Segoe UI
 ```
 
-The checked-in config keeps the author's `Input` preset. If that font isn't installed, the launcher uses Segoe UI. No fonts are bundled. Input has its own [license](https://input.djr.com/license/); it isn't covered by this project's MIT license.
+If the chosen font isn't installed, the launcher falls back to Segoe UI. No fonts are bundled.
 
 Font replacement affects the whole interface. Wider fonts can make BPM values or other fixed-width fields show an ellipsis. The palette also affects some artwork and waveform images.
 
@@ -41,6 +41,33 @@ Tested with rekordbox **7.2.18 and 7.2.19**, Windows x64. The newest installed v
 rekordbox-font.exe --list
 rekordbox-font.exe --exe "D:\rekordbox\rekordbox.exe"
 ```
+
+## Optional: Input Sans Compressed
+
+This is the narrow, light font used during development. The letter shapes weren't manually compressed: Compressed is an existing Input width. The author's download builder combines the chosen styles into a four-style family named `Input`.
+
+1. Open the [official Input download page](https://input.djr.com/download/) and choose **Download a custom four-style family**.
+2. Select these styles:
+
+| Family slot | Input style |
+| --- | --- |
+| Regular | Input Sans Compressed Light |
+| Italic | Input Sans Compressed Light Italic |
+| Bold | Input Sans Compressed Regular |
+| Bold Italic | Input Sans Compressed Italic |
+
+3. Leave the character defaults unchanged and built-in line spacing at **1.2×**. Download and extract the ZIP.
+4. Close rekordbox. Select the four `.ttf` files under `Input_Fonts/Input`, right-click and choose **Install** (under **Show more options** on Windows 11).
+5. Set the family in `font.ini` and start through the launcher:
+
+```ini
+[Font]
+Family=Input
+```
+
+This maps the family's bold slot to Regular, keeping emphasized text from getting too heavy. Avoid installing several custom Input families at once: the builder gives them the same internal name, `Input`.
+
+Input has a separate [license](https://input.djr.com/license/), not this project's MIT license. Its free license covers development and plain text; non-development use requires a separate license. Download it from the author and check the terms for your use. Font files are not included in this repository or its releases.
 
 ## Build
 
