@@ -17,15 +17,15 @@
 using BlitFn=int (WINAPI*)(HDC,int,int,int,int,int,int,int,int,const void*,const BITMAPINFO*,UINT,DWORD);
 static BlitFn originalBlit;
 static uint8_t neutral[256];
-static bool enabled=true, mutedBlue=true;
-static int blueDimming=100, tintStrength=0;
+static bool enabled=true;
+static int tintStrength=0;
 static uint32_t tintColor=0;
 static uint8_t tintTable[3][256]; // R, G, B; prepared once at startup.
-static bool highlightEnabled=false, customHighlightSource=false;
-static uint32_t highlightColor=0, highlightSourceColor=0x1473e6;
+static bool highlightEnabled=false;
+static uint32_t highlightColor=0, highlightSourceColor=0;
 static int highlightStrength=100;
-static int highlightSource[3]{20,115,230}, highlightTarget[3]{};
-static int highlightSourceMin=20, highlightSourceChroma=210;
+static int highlightSource[3]{}, highlightTarget[3]{};
+static int highlightSourceMin=0, highlightSourceChroma=0;
 static unsigned highlightCoverage[256];
 static wchar_t paletteLog[MAX_PATH];
 static std::atomic<unsigned> frameCount{0};
@@ -55,25 +55,20 @@ static uint32_t TintPixel(uint32_t p) {
     return (p&0xff000000)|(uint32_t(tintTable[0][(p>>16)&255])<<16)|
            (uint32_t(tintTable[1][(p>>8)&255])<<8)|tintTable[2][p&255];
 }
-static bool IsNativeBlue(int r,int g,int b) {
-    return b>g&&g>r&&(g-r)*4>(b-r)&&(g-r)*5<(b-r)*4;
-}
 static uint32_t HighlightPixel(uint32_t p,uint32_t base) {
     if(!highlightEnabled||!highlightStrength)return base;
     int rgb[]={int((p>>16)&255),int((p>>8)&255),int(p&255)};
     int low=std::min({rgb[0],rgb[1],rgb[2]});
     int chroma=std::max({rgb[0],rgb[1],rgb[2]})-low;
-    if(customHighlightSource) {
-        if(!highlightSourceChroma) {
-            // Neutral source colors have no hue; only match that exact shade.
-            if((p&0xffffff)!=highlightSourceColor)return base;
-        } else {
-            if(!chroma)return base;
-            int tolerance=chroma*highlightSourceChroma/5;
-            for(int i=0;i<3;i++)
-                if(std::abs((rgb[i]-low)*highlightSourceChroma-(highlightSource[i]-highlightSourceMin)*chroma)>tolerance)return base;
-        }
-    } else if(!IsNativeBlue(rgb[0],rgb[1],rgb[2]))return base;
+    if(!highlightSourceChroma) {
+        // Neutral source colors have no hue; only match that exact shade.
+        if((p&0xffffff)!=highlightSourceColor)return base;
+    } else {
+        if(!chroma)return base;
+        int tolerance=chroma*highlightSourceChroma/5;
+        for(int i=0;i<3;i++)
+            if(std::abs((rgb[i]-low)*highlightSourceChroma-(highlightSource[i]-highlightSourceMin)*chroma)>tolerance)return base;
+    }
     unsigned coverage=highlightSourceChroma?highlightCoverage[chroma]:256;
     int background=low*256-highlightSourceMin*int(coverage);
     uint32_t result=p&0xff000000;
@@ -106,18 +101,6 @@ static uint32_t BasePixel(uint32_t p) {
     unsigned r=(p>>16)&255,g=(p>>8)&255,b=p&255;
     if(r==g && g==b) {
         unsigned v=neutral[r];return (p&0xff000000)|(v<<16)|(v<<8)|v;
-    }
-    // Continuous colour transform also covers antialiased edges around text.
-    // A flat-fill-only replacement would leave bright blue fringes.
-    if(mutedBlue && blueDimming && IsNativeBlue(int(r),int(g),int(b))) {
-        int strength=std::min(210,int(b-r));
-        int nr=std::clamp(int(neutral[r])+12*strength/210,0,255);
-        int ng=std::clamp(int(neutral[g])-47*strength/210,0,255);
-        int nb=std::clamp(int(neutral[b])-89*strength/210,0,255);
-        nr=(int(r)*(100-blueDimming)+nr*blueDimming+50)/100;
-        ng=(int(g)*(100-blueDimming)+ng*blueDimming+50)/100;
-        nb=(int(b)*(100-blueDimming)+nb*blueDimming+50)/100;
-        return (p&0xff000000)|(nr<<16)|(ng<<8)|nb;
     }
     return p;
 }
@@ -196,12 +179,6 @@ static int WINAPI blitHook(HDC dc,int dx,int dy,int dw,int dh,int sx,int sy,int 
             QueryPerformanceFrequency(&freq);
             FILE* f=nullptr;if(!_wfopen_s(&f,paletteLog,L"a")) {
                 fprintf(f,"frame %u: %dx%d, palette %.3f ms\n",frame,w,h,1000.0*(end.QuadPart-start.QuadPart)/freq.QuadPart);
-                if(frame==0) {
-                    // Diagnostics: only colour values and counts, never pixels/content.
-                    unsigned counts[256]{};
-                    for(size_t i=0;i<count;i++){auto p=src[i];unsigned r=(p>>16)&255,g=(p>>8)&255,b=p&255;if(r<50&&g>60&&g<170&&b>170)counts[g]++;}
-                    for(unsigned g=61;g<170;g++)if(counts[g]>500)fprintf(f,"blue pixels with G=%u: %u\n",g,counts[g]);
-                }
                 fclose(f);
             }
         }
@@ -212,20 +189,15 @@ static int WINAPI blitHook(HDC dc,int dx,int dy,int dw,int dh,int sx,int sy,int 
 }
 static void ReadPaletteSettings(const wchar_t* path) {
     enabled=GetPrivateProfileIntW(L"Palette",L"Enabled",1,path)!=0;
-    mutedBlue=GetPrivateProfileIntW(L"Palette",L"MutedBlue",1,path)!=0;
-    blueDimming=std::clamp(int(GetPrivateProfileIntW(L"Palette",L"BlueDimming",100,path)),0,100);
     tintStrength=std::clamp(int(GetPrivateProfileIntW(L"Palette",L"TintStrength",0,path)),0,100);
     wchar_t tint[64]{};
     GetPrivateProfileStringW(L"Palette",L"TintColor",L"#000000",tint,64,path);
     if(!ParseRgb(tint,tintColor))tintStrength=0;
     wchar_t target[64]{},source[64]{};
     GetPrivateProfileStringW(L"Palette",L"HighlightColor",L"",target,64,path);
-    highlightEnabled=ParseRgb(target,highlightColor);
     highlightStrength=std::clamp(int(GetPrivateProfileIntW(L"Palette",L"HighlightStrength",100,path)),0,100);
     GetPrivateProfileStringW(L"Palette",L"HighlightSourceColor",L"",source,64,path);
-    customHighlightSource=source[0]!=0;
-    highlightSourceColor=0x1473e6;
-    if(customHighlightSource&&!ParseRgb(source,highlightSourceColor))highlightEnabled=false;
+    highlightEnabled=ParseRgb(target,highlightColor)&&ParseRgb(source,highlightSourceColor);
 }
 bool InstallPalette(const wchar_t* path) {
     ReadPaletteSettings(path);

@@ -10,11 +10,9 @@
 | Palette | Enabled | `0` disables color processing |
 | Palette | BlackLevel | Darkest neutral shade, clamped to 0–40; default 24 |
 | Palette | WhiteLevel | Brightest neutral shade, clamped to 160–255; default 192 |
-| Palette | MutedBlue | `1` softens blue shades; default 1 |
-| Palette | BlueDimming | Strength of blue softening, 0–100; default 100, shipped preset 50 |
 | Palette | HighlightColor | Replacement highlight color as `#RRGGBB`; empty disables recoloring |
 | Palette | HighlightStrength | Recoloring strength, 0–100; default 100 |
-| Palette | HighlightSourceColor | Original color to match; empty matches native blue shades |
+| Palette | HighlightSourceColor | Original RGB color to match; empty disables replacement |
 | Palette | TintColor | Overlay color as `#RRGGBB` or `RRGGBB`; default `#000000` |
 | Palette | TintStrength | Overlay strength, 0–100; default 0 (off) |
 | Window | DarkTitleBar | `1` requests a dark native title bar; default 1 |
@@ -24,11 +22,11 @@ The local `Input` preset was downloaded through the font author's custom-family 
 
 For a subtle warm tint, try `TintColor=#C88B55` and `TintStrength=5`. The RGB overlay is blended after the existing palette transform. A strength of 100 replaces the processed image with a flat color; use small values for a readable interface. An invalid color disables the overlay. The same tint is applied to adjusted dark OpenGL backgrounds. It can affect artwork and waveform images too.
 
-`BlueDimming=100` keeps the original muted-blue treatment. Lower values keep more of rekordbox's original blue; 0 leaves blue pixels unchanged before tinting. Set `MutedBlue=0` to bypass this adjustment entirely. The shipped value of 50 makes blue highlights brighter while retaining softer neutral colors. This affects blue pixels, not widget focus: it cannot distinguish an active playlist from an inactive one with the same source color, and blue images can change too.
+Color replacement is defined by `HighlightSourceColor`, `HighlightColor` and `HighlightStrength`. The source and target can be any RGB colors. There are no color-specific processing rules. The shipped configuration maps `#1473E6` to `#1C5AA2` at strength 100; these are editable config values, not special cases in the algorithm.
 
-`HighlightColor` accepts any RGB target, including gray, white and black. With `HighlightStrength=100`, the native blue reference `#1473E6` maps to that exact target before the overall tint. Lower strengths blend with the existing palette output. Darker shades and antialiased edges retain their neutral contribution. Empty or invalid target colors disable recoloring; strength 0 also leaves the previous palette output unchanged. `MutedBlue=0` does not disable custom highlight recoloring.
+With `HighlightStrength=100`, the exact source color maps to the exact target before the overall tint. Lower strengths blend with the neutral-adjusted image. Darker shades and antialiased edges retain their neutral contribution. Empty or invalid source/target colors disable replacement; strength 0 also leaves the neutral-adjusted image unchanged.
 
-`HighlightSourceColor` can be any RGB source. Colored sources match nearby hues with a fixed tolerance, including lighter and darker shades; neutral sources match only that exact RGB shade. Leave it empty to use the existing native-blue detector. An invalid explicit source disables recoloring. This is a pixel transform, not focus tracking: any image pixels in the same color range can be affected. Recoloring runs after the neutral/blue-softening transform and before the overall tint. The gray lookup table uses the same transform as the scalar path.
+Colored sources match nearby hues with a fixed tolerance, including lighter and darker shades; neutral sources match only that exact RGB shade. This is a pixel transform, not focus tracking: any image pixels in the same color range can be affected. Replacement runs after the neutral transform and before the overall tint. The gray lookup table uses the same transform as the scalar path.
 
 ## Launcher
 
@@ -42,7 +40,7 @@ The launcher starts the selected EXE suspended, loads `font_hook.dll` through `L
 
 MinHook intercepts DirectWrite `FindFamilyName` and `CreateTextFormat`, plus GDI `CreateFontIndirectW`. Arial and Arial Unicode MS requests are redirected to the configured family. There is no per-widget selection: deck numbers, controls and library text can all change. Fixed-width fields may truncate wider fonts.
 
-The palette transforms neutral and selected blue pixels in eligible 32-bit GDI bitmaps passed to `StretchDIBits`. Dark neutral OpenGL clear colors are adjusted too. AVX2 is used when the CPU and OS support it; other machines use a scalar path. This processes some already-rendered images, so covers and waveform thumbnails can change. It isn't a semantic theme engine. Color processing adds CPU work; the cost depends on the redrawn area.
+The palette adjusts neutral shades, replaces a configurable source color and applies an optional RGB tint to eligible 32-bit GDI bitmaps passed to `StretchDIBits`. Dark neutral OpenGL clear colors are adjusted too. AVX2 is used when the CPU and OS support it; other machines use a scalar path. This processes some already-rendered images, so covers and waveform thumbnails can change. It isn't a semantic theme engine. Color processing adds CPU work; the cost depends on the redrawn area.
 
 A startup worker requests a dark DWM title bar after the main window appears. It exits after the first attempt on that window, or a 60-second timeout. There is no permanent window polling, cursor manipulation or background helper app.
 

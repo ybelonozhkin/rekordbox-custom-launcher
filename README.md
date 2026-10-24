@@ -23,11 +23,17 @@ The checked-in config keeps the author's `Input` preset. If that font isn't inst
 
 Font replacement affects the whole interface. Wider fonts can make BPM values or other fixed-width fields show an ellipsis. The palette also affects some artwork and waveform images.
 
-In `[Palette]`, set `TintColor` to any RGB hex color (`#RRGGBB`) and `TintStrength` to its strength from 0 to 100. This adds an overall tint to the processed interface image, including artwork; it isn't limited to blue highlights. For example, `TintColor=#C88B55` with `TintStrength=5` adds a subtle warm tint. Use 0 for no overlay; 100 fills the processed image with the chosen color. Separately rendered OpenGL content and native window elements are not covered by this image filter. Restart after changing settings.
+In `[Palette]`, set `TintColor` to any RGB hex color (`#RRGGBB`) and `TintStrength` to its strength from 0 to 100. This adds an overall tint to the processed interface image, including artwork. For example, `TintColor=#C88B55` with `TintStrength=5` adds a subtle warm tint. Use 0 for no overlay; 100 fills the processed image with the chosen color. Separately rendered OpenGL content and native window elements are not covered by this image filter. Restart after changing settings.
 
-To change the highlight color, set `HighlightColor` to any RGB hex color and `HighlightStrength` to 0–100. For example, `HighlightColor=#B06C42` and `HighlightStrength=100` replace the original blue with orange-brown. Leave `HighlightColor` empty to keep the current colors. This matches pixel colors rather than widget roles, so similar colors in images can change too.
+To replace a color, set `HighlightSourceColor` to the original RGB color, `HighlightColor` to the desired RGB color, and `HighlightStrength` to 0–100. Both colors can be any `#RRGGBB` value. For example:
 
-`HighlightSourceColor` optionally selects a different original color to replace; leave it empty to match rekordbox's native blue shades. `BlueDimming` remains available for the old blue-softening preset. The overall tint is applied after these adjustments. Restart to apply changes.
+```ini
+HighlightSourceColor=#1473E6
+HighlightColor=#B06C42
+HighlightStrength=100
+```
+
+Use 0 strength or leave either color empty to disable replacement. The overall tint is applied afterward. This matches pixel colors rather than widget roles, so similar colors in images can change too. Restart to apply changes.
 
 Tested with rekordbox **7.2.18 and 7.2.19**, Windows x64. The newest installed version is selected automatically. Future versions may need changes to the hooks. The binaries are unsigned.
 
