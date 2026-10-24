@@ -8,4 +8,4 @@ MinHook includes Hacker Disassembler Engine code, copyright 2008–2009 Vyachesl
 
 ## Fonts and rekordbox
 
-No font files, rekordbox binaries or rekordbox artwork are distributed here. Installed fonts retain their own licenses. The MIT license covers this project's code and documentation, not rekordbox or third-party fonts.
+Obtain rekordbox and fonts from their publishers under their respective licenses. This project's code and documentation use the MIT license.
