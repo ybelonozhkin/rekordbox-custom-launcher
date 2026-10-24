@@ -23,7 +23,9 @@ The checked-in config keeps the author's `Input` preset. If that font isn't inst
 
 Font replacement affects the whole interface. Wider fonts can make BPM values or other fixed-width fields show an ellipsis. The palette also affects some artwork and waveform images.
 
-In `[Palette]`, `TintColor=#C88B55` with `TintStrength=5` adds a light warm tint. Keep `TintStrength=0` for no overlay. `BlueDimming` controls how much blue highlights are softened: 100 is the original muted preset, 50 is brighter, 0 keeps the original blue. Restart after changing settings.
+In `[Palette]`, set `TintColor` to any RGB hex color (`#RRGGBB`) and `TintStrength` to its strength from 0 to 100. This adds an overall tint to the processed interface image, including artwork; it isn't limited to blue highlights. For example, `TintColor=#C88B55` with `TintStrength=5` adds a subtle warm tint. Use 0 for no overlay; 100 fills the processed image with the chosen color. Separately rendered OpenGL content and native window elements are not covered by this image filter. Restart after changing settings.
+
+`BlueDimming` is a separate adjustment for blue highlights: 100 is the original muted preset, 50 is brighter, 0 keeps the original blue before tinting.
 
 Tested with rekordbox **7.2.18 and 7.2.19**, Windows x64. The newest installed version is selected automatically. Future versions may need changes to the hooks. The binaries are unsigned.
 
