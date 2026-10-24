@@ -27,6 +27,8 @@ static int highlightStrength=100;
 static int highlightSource[3]{}, highlightTarget[3]{};
 static int highlightSourceMin=0, highlightSourceChroma=0;
 static unsigned highlightCoverage[256];
+static int highlightSourceRelative[3]{};
+static uint32_t highlightTable[256*256];
 static wchar_t paletteLog[MAX_PATH];
 static std::atomic<unsigned> frameCount{0};
 static uint32_t greyTable[256];
@@ -66,16 +68,16 @@ static uint32_t HighlightPixel(uint32_t p,uint32_t base) {
     } else {
         if(!chroma)return base;
         int tolerance=chroma*highlightSourceChroma/5;
-        for(int i=0;i<3;i++)
-            if(std::abs((rgb[i]-low)*highlightSourceChroma-(highlightSource[i]-highlightSourceMin)*chroma)>tolerance)return base;
+        if(std::abs((rgb[0]-low)*highlightSourceChroma-highlightSourceRelative[0]*chroma)>tolerance ||
+           std::abs((rgb[1]-low)*highlightSourceChroma-highlightSourceRelative[1]*chroma)>tolerance ||
+           std::abs((rgb[2]-low)*highlightSourceChroma-highlightSourceRelative[2]*chroma)>tolerance)return base;
     }
-    unsigned coverage=highlightSourceChroma?highlightCoverage[chroma]:256;
-    int background=low*256-highlightSourceMin*int(coverage);
+    uint32_t replacement=highlightTable[(low<<8)|chroma];
+    if(highlightStrength==100)return (p&0xff000000)|replacement;
     uint32_t result=p&0xff000000;
     for(int i=0;i<3;i++) {
-        // Retain the neutral contribution at antialiased edges and dimmer shades.
-        int target=std::clamp((background+highlightTarget[i]*int(coverage)+128)/256,0,255);
         int shift=16-i*8;
+        int target=(replacement>>shift)&255;
         int previous=(base>>shift)&255;
         unsigned value=unsigned((previous*(100-highlightStrength)+target*highlightStrength+50)/100);
         result|=value<<shift;
@@ -116,7 +118,15 @@ static void PreparePalette() {
     }
     highlightSourceMin=std::min({highlightSource[0],highlightSource[1],highlightSource[2]});
     highlightSourceChroma=std::max({highlightSource[0],highlightSource[1],highlightSource[2]})-highlightSourceMin;
+    for(int i=0;i<3;i++)highlightSourceRelative[i]=highlightSource[i]-highlightSourceMin;
     for(unsigned v=0;v<256;v++)highlightCoverage[v]=highlightSourceChroma?std::min(256u,(v*256+highlightSourceChroma/2)/highlightSourceChroma):256;
+    if(highlightEnabled&&highlightStrength)for(int low=0;low<256;low++)for(int chroma=0;chroma<256;chroma++) {
+        int coverage=int(highlightCoverage[chroma]);
+        int background=low*256-highlightSourceMin*coverage;
+        uint32_t color=0;
+        for(int i=0;i<3;i++)color|=uint32_t(std::clamp((background+highlightTarget[i]*coverage+128)/256,0,255))<<(16-i*8);
+        highlightTable[(low<<8)|chroma]=color;
+    }
     for(int channel=0;channel<3;channel++) {
         int target=(tintColor>>(16-8*channel))&255;
         for(int v=0;v<256;v++)tintTable[channel][v]=uint8_t((v*(100-tintStrength)+target*tintStrength+50)/100);
@@ -147,7 +157,11 @@ __declspec(noinline) static void RenderAvx2(uint32_t* dst,const uint32_t* src,si
 }
 static void RenderPixels(uint32_t* dst,const uint32_t* src,size_t count) {
     if(haveAvx2)RenderAvx2(dst,src,count);
-    else for(size_t i=0;i<count;i++)dst[i]=mapPixel(src[i]);
+    else for(size_t i=0;i<count;i++) {
+        uint32_t p=src[i],v=p&255;
+        if(((p>>8)&255)==v&&((p>>16)&255)==v)dst[i]=(p&0xff000000)|greyTable[v];
+        else dst[i]=mapPixel(p);
+    }
 }
 static int WINAPI blitHook(HDC dc,int dx,int dy,int dw,int dh,int sx,int sy,int sw,int sh,const void* bits,const BITMAPINFO* bi,UINT use,DWORD rop) {
     if(!enabled||!bits||!bi||bi->bmiHeader.biBitCount!=32||bi->bmiHeader.biPlanes!=1||

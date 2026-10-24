@@ -26,7 +26,7 @@ Color replacement is defined by `HighlightSourceColor`, `HighlightColor` and `Hi
 
 With `HighlightStrength=100`, the exact source color maps to the exact target before the overall tint. Lower strengths blend with the neutral-adjusted image. Darker shades and antialiased edges retain their neutral contribution. Empty or invalid source/target colors disable replacement; strength 0 also leaves the neutral-adjusted image unchanged.
 
-Colored sources match nearby hues with a fixed tolerance, including lighter and darker shades; neutral sources match only that exact RGB shade. This is a pixel transform, not focus tracking: any image pixels in the same color range can be affected. Replacement runs after the neutral transform and before the overall tint. The gray lookup table uses the same transform as the scalar path.
+Colored sources match nearby hues with a fixed tolerance, including lighter and darker shades; neutral sources match only that exact RGB shade. This is a pixel transform, not focus tracking: any image pixels in the same color range can be affected. Replacement runs after the neutral transform and before the overall tint. Replacement colors are precomputed in a 256 KiB lookup table at startup. Both AVX2 and scalar rendering use the same gray lookup table.
 
 ## Launcher
 
