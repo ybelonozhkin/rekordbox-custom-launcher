@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cmath>
+#include <cwchar>
 #include <immintrin.h>
 #include <intrin.h>
 #include "../vendor/minhook/include/MinHook.h"
@@ -17,6 +18,9 @@ using BlitFn=int (WINAPI*)(HDC,int,int,int,int,int,int,int,int,const void*,const
 static BlitFn originalBlit;
 static uint8_t neutral[256];
 static bool enabled=true, mutedBlue=true;
+static int blueDimming=100, tintStrength=0;
+static uint32_t tintColor=0;
+static uint8_t tintTable[3][256]; // R, G, B; prepared once at startup.
 static wchar_t paletteLog[MAX_PATH];
 static std::atomic<unsigned> frameCount{0};
 static uint32_t greyTable[256];
@@ -25,10 +29,34 @@ using ClearFn=void (WINAPI*)(float,float,float,float);
 static ClearFn originalClear;
 static std::atomic<unsigned> glClears{0};
 
+static bool ParseRgb(const wchar_t* text,uint32_t& result) {
+    if(!text)return false;
+    if(*text==L'#')++text;
+    if(wcslen(text)!=6)return false;
+    uint32_t value=0;
+    for(int i=0;i<6;i++) {
+        wchar_t ch=text[i];int digit=-1;
+        if(ch>=L'0'&&ch<=L'9')digit=ch-L'0';
+        else if(ch>=L'a'&&ch<=L'f')digit=ch-L'a'+10;
+        else if(ch>=L'A'&&ch<=L'F')digit=ch-L'A'+10;
+        if(digit<0)return false;
+        value=(value<<4)|digit;
+    }
+    result=value;return true;
+}
+static uint32_t TintPixel(uint32_t p) {
+    if(!tintStrength)return p;
+    return (p&0xff000000)|(uint32_t(tintTable[0][(p>>16)&255])<<16)|
+           (uint32_t(tintTable[1][(p>>8)&255])<<8)|tintTable[2][p&255];
+}
+
 static void WINAPI clearHook(float r,float g,float b,float a) {
     if(enabled && a>=0.999f && r==g && g==b && r>=0 && r<=1) {
         int v=std::clamp(int(std::lround(r*255)),0,255);
-        if(v<=32)r=g=b=neutral[v]/255.0f;
+        if(v<=32) {
+            uint32_t color=greyTable[v];
+            r=((color>>16)&255)/255.0f;g=((color>>8)&255)/255.0f;b=(color&255)/255.0f;
+        }
     }
     originalClear(r,g,b,a);
     if(glClears.fetch_add(1)==0) {
@@ -36,24 +64,32 @@ static void WINAPI clearHook(float r,float g,float b,float a) {
     }
 }
 
-static uint32_t mapPixel(uint32_t p) {
+static uint32_t BasePixel(uint32_t p) {
     unsigned r=(p>>16)&255,g=(p>>8)&255,b=p&255;
     if(r==g && g==b) {
         unsigned v=neutral[r];return (p&0xff000000)|(v<<16)|(v<<8)|v;
     }
     // Continuous colour transform also covers antialiased edges around text.
     // A flat-fill-only replacement would leave bright blue fringes.
-    if(mutedBlue && b>g && g>r && (g-r)*4>(b-r) && (g-r)*5<(b-r)*4) {
+    if(mutedBlue && blueDimming && b>g && g>r && (g-r)*4>(b-r) && (g-r)*5<(b-r)*4) {
         int strength=std::min(210,int(b-r));
         int nr=std::clamp(int(neutral[r])+12*strength/210,0,255);
         int ng=std::clamp(int(neutral[g])-47*strength/210,0,255);
         int nb=std::clamp(int(neutral[b])-89*strength/210,0,255);
+        nr=(int(r)*(100-blueDimming)+nr*blueDimming+50)/100;
+        ng=(int(g)*(100-blueDimming)+ng*blueDimming+50)/100;
+        nb=(int(b)*(100-blueDimming)+nb*blueDimming+50)/100;
         return (p&0xff000000)|(nr<<16)|(ng<<8)|nb;
     }
     return p;
 }
+static uint32_t mapPixel(uint32_t p) {return TintPixel(BasePixel(p));}
 static void PreparePalette() {
-    for(unsigned v=0;v<256;v++)greyTable[v]=unsigned(neutral[v])*0x010101;
+    for(int channel=0;channel<3;channel++) {
+        int target=(tintColor>>(16-8*channel))&255;
+        for(int v=0;v<256;v++)tintTable[channel][v]=uint8_t((v*(100-tintStrength)+target*tintStrength+50)/100);
+    }
+    for(unsigned v=0;v<256;v++)greyTable[v]=TintPixel(unsigned(neutral[v])*0x010101);
     int cpu[4];__cpuid(cpu,0);int maxLeaf=cpu[0];__cpuid(cpu,1);
     if(maxLeaf>=7&&(cpu[2]&(1<<27))&&(cpu[2]&(1<<28))&&(_xgetbv(0)&6)==6) {
         __cpuidex(cpu,7,0);haveAvx2=(cpu[1]&(1<<5))!=0;
@@ -125,9 +161,17 @@ static int WINAPI blitHook(HDC dc,int dx,int dy,int dw,int dh,int sx,int sy,int 
         return originalBlit(dc,dx,dy,dw,dh,sx,sy,sw,sh,bits,bi,use,rop);
     }
 }
-bool InstallPalette(const wchar_t* path) {
+static void ReadPaletteSettings(const wchar_t* path) {
     enabled=GetPrivateProfileIntW(L"Palette",L"Enabled",1,path)!=0;
     mutedBlue=GetPrivateProfileIntW(L"Palette",L"MutedBlue",1,path)!=0;
+    blueDimming=std::clamp(int(GetPrivateProfileIntW(L"Palette",L"BlueDimming",100,path)),0,100);
+    tintStrength=std::clamp(int(GetPrivateProfileIntW(L"Palette",L"TintStrength",0,path)),0,100);
+    wchar_t tint[64]{};
+    GetPrivateProfileStringW(L"Palette",L"TintColor",L"#000000",tint,64,path);
+    if(!ParseRgb(tint,tintColor))tintStrength=0;
+}
+bool InstallPalette(const wchar_t* path) {
+    ReadPaletteSettings(path);
     if(!enabled)return true;
     wcscpy_s(paletteLog,path);auto slash=wcsrchr(paletteLog,L'\\');if(slash)wcscpy_s(slash+1,MAX_PATH-(slash+1-paletteLog),L"palette.log");
     int floor=std::clamp(int(GetPrivateProfileIntW(L"Palette",L"BlackLevel",24,path)),0,40);
