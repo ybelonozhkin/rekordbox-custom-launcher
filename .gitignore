@@ -1,0 +1,31 @@
+# Personal notes, downloads, fonts, experiments and old builds.
+/_private/
+/AGENTS.md
+
+# Runtime files are attached to releases, not committed.
+/bin/*
+!/bin/font.ini
+*.log
+
+# Build and release output.
+/build/
+/dist/
+*.obj
+*.exp
+*.lib
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.bak
+__pycache__/
+.vs/
+.vscode/
+
+# No font files or third-party application artwork in this repository.
+*.ttf
+*.otf
+*.ttc
+*.woff
+*.woff2
+*.ico
