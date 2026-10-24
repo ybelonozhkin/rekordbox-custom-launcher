@@ -54,6 +54,6 @@ For performance comparisons, close screen automation and accessibility inspectio
 
 ## Packaging
 
-`scripts/package.ps1` uses an explicit file list for binary releases. It includes the EXE, DLL, a Segoe UI config, README, CHANGELOG, MIT license, third-party notices and the MinHook license. Source ZIPs come from the current Git commit and require a clean working tree. Personal files, fonts, logs and application artwork stay out.
+`scripts/package.ps1` uses an explicit file list for binary releases. It includes the EXE, DLL, a Segoe UI config, README, BUILDING, CHANGELOG, MIT license, third-party notices and the MinHook license. Source ZIPs come from the current Git commit and require a clean working tree. Personal files, fonts, logs and application artwork stay out.
 
-The GitHub workflow builds and tests on Windows, then uploads both archives and their SHA-256 checksums. Tags named `v*` publish those files as a GitHub Release.
+The GitHub workflow builds and tests on Windows, then uploads both archives and their SHA-256 checksums. Version tags publish those files as a GitHub Release after checking the archive hashes. See [BUILDING.md](../BUILDING.md) for source-build and release instructions.

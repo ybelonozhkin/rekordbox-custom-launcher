@@ -71,15 +71,9 @@ Input has a separate [license](https://input.djr.com/license/), not this project
 
 ## Build
 
-Install Visual Studio 2022 or newer with **Desktop development with C++** and a Windows SDK. Python 3 is needed only for the discovery test.
+GitHub Actions builds, tests and publishes a release when a version tag is pushed. Each release includes a Windows x64 ZIP, a separate source ZIP and SHA-256 checksums. The source archive includes the build scripts and dependencies.
 
-```bat
-scripts\build.cmd
-scripts\test.cmd
-powershell -ExecutionPolicy Bypass -File scripts\package.ps1 -Version 0.1.0
-```
-
-The EXE, DLL and local config live in `bin/`. Release ZIPs go to `dist/`. The build leaves an existing `bin/font.ini` alone. Tagged GitHub builds also create a release automatically.
+To build your own copy, follow [BUILDING.md](BUILDING.md). The EXE, DLL and config live in `bin/`; release archives go to `dist/`.
 
 [Settings and implementation](docs/technical.md) · [Changelog](CHANGELOG.md)
 
