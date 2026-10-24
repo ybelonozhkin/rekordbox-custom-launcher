@@ -4,6 +4,8 @@ A different font, softer colors and a dark title bar for rekordbox on Windows.
 
 The launcher loads a small DLL into rekordbox. It doesn't patch installed files or touch your music or database. Start rekordbox normally to use its original look.
 
+The native window title bar also matches a dark Windows theme. This is enabled by default with `DarkTitleBar=1` in the `[Window]` section of `font.ini`; set it to `0` to leave the title bar unchanged.
+
 ## Use
 
 1. Download and extract the Windows x64 ZIP from Releases.
