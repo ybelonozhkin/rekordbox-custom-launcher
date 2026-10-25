@@ -8,7 +8,7 @@ The native title bar uses a dark style by default. Set `DarkTitleBar=0` in `[Win
 
 ## Use
 
-1. Download and extract the Windows x64 ZIP from Releases.
+1. Download and extract the Windows x64 ZIP from [Releases](https://github.com/ybelonozhkin/rekordbox-custom-launcher/releases/latest).
 2. Close rekordbox, then run `rekordbox-font.exe` from the extracted folder.
 3. Edit `font.ini` beside the EXE to change the settings. Restart through the launcher to apply them.
 
