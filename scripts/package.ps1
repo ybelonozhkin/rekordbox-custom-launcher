@@ -31,6 +31,7 @@ try {
         'rekordbox-font.exe' = 'bin/rekordbox-font.exe'
         'font_hook.dll' = 'bin/font_hook.dll'
         'README.md' = 'README.md'
+        'assets/screenshot.png' = 'assets/screenshot.png'
         'BUILDING.md' = 'BUILDING.md'
         'CHANGELOG.md' = 'CHANGELOG.md'
         'LICENSE' = 'LICENSE'

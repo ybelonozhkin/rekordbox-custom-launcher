@@ -6,6 +6,8 @@ The launcher loads a small DLL into rekordbox. It doesn't patch installed files 
 
 The native title bar uses a dark style by default. Set `DarkTitleBar=0` in `[Window]` to disable it.
 
+![rekordbox running with the custom launcher](assets/screenshot.png)
+
 ## Use
 
 1. Download and extract the Windows x64 ZIP from [Releases](https://github.com/ybelonozhkin/rekordbox-custom-launcher/releases/latest).
